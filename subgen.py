@@ -1,4 +1,4 @@
-subgen_version = '2024.10.1.122'
+subgen_version = '2024.10.18.2'
 
 from datetime import datetime
 import subprocess
@@ -79,8 +79,8 @@ except ValueError:
 if transcribe_device == "gpu":
     transcribe_device = "cuda"
         
-subextension =  f".subgen.{whisper_model.split('.')[0]}.{namesublang}.srt"
-subextensionSDH =  f".subgen.{whisper_model.split('.')[0]}.{namesublang}.sdh.srt"
+subextension =  f".{namesublang}.srt"
+subextensionSDH =  f".{namesublang}.sdh.srt"
 
 app = FastAPI()
 model = None
@@ -201,7 +201,7 @@ def has_image_extension(file_path):
 @app.get("/detect-language")
 @app.get("/tautulli")
 def handle_get_request(request: Request):
-    return {"You accessed this request incorrectly via a GET request.  See https://github.com/McCloudS/subgen for proper configuration"}
+    return {"You accessed this request incorrectly via a GET request.  See https://github.com/jpsn123/subgen for proper configuration"}
 
 @app.get("/")
 def webui():
@@ -293,9 +293,6 @@ def receive_emby_webhook(
         data: Union[str, None] = Form(None),
 ):
     logging.debug("Raw response: %s", data)
-
-    if "Emby Server" not in user_agent:
-        return {"This doesn't appear to be a properly configured Emby webhook, please review the instructions again!"}
 
     if not data:
         return ""
@@ -523,12 +520,16 @@ def gen_subtitles_queue(file_path: str, transcription_type: str, force_language=
         # Check if an internal subtitle with the force_language already exists
         if has_subtitle_language(file_path, force_language):
             message = f"{file_path} already has an internal subtitle for {force_language}, skipping generation"
+        if get_file_name_without_extension(file_path).endswith("-c") or get_file_name_without_extension(file_path).endswith("-uc"):
+            message = f"{file_path} already has an internal subtitle, skipping generation"
         # Check if an external subtitle with the force_language already exists
         elif skipifexternalsub and (os.path.exists(get_file_name_without_extension(file_path) + f".{force_language}.srt") or os.path.exists(get_file_name_without_extension(file_path) + f".{force_language}.ass")):
             message = f"{file_path} already has an external {force_language} subtitle created for this, skipping it"
     else:
         if has_subtitle_language(file_path, skipifinternalsublang):
             message = f"{file_path} already has an internal subtitle we want, skipping generation"
+        if get_file_name_without_extension(file_path).endswith("-c") or get_file_name_without_extension(file_path).endswith("-uc"):
+            message = f"{file_path} already has an internal subtitle, skipping generation"
         elif os.path.exists(get_file_name_without_extension(file_path) + subextension):
             message = f"{file_path} already has a subtitle created for this, skipping it"
         elif skipifexternalsub and (os.path.exists(get_file_name_without_extension(file_path) + f".{namesublang}.srt") or os.path.exists(get_file_name_without_extension(file_path) + f".{namesublang}.ass")):
