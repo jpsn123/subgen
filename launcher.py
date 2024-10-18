@@ -119,7 +119,7 @@ def main():
     
     if args.launcher_update or convert_to_bool(os.getenv('LAUNCHER_UPDATE')):
         print(f"Updating launcher.py from GitHub branch {branch_name}...")
-        download_from_github(f"https://raw.githubusercontent.com/McCloudS/subgen/{branch_name}/launcher.py", f'launcher{script_name}')
+        download_from_github(f"https://raw.githubusercontent.com/jpsn123/subgen/{branch_name}/launcher.py", f'launcher{script_name}')
 
     # Prepare the arguments to exclude update triggers
     excluded_args = ['--launcher-update', '-l']
@@ -142,7 +142,7 @@ def main():
     load_env_variables()
 
     # URL to the requirements.txt file on GitHub
-    requirements_url = "https://raw.githubusercontent.com/McCloudS/subgen/main/requirements.txt"
+    requirements_url = "https://raw.githubusercontent.com/jpsn123/subgen/main/requirements.txt"
     requirements_file = "requirements.txt"
 
     # Install packages from requirements.txt if the install or packageupdate argument is True
@@ -153,7 +153,7 @@ def main():
     # Check if the script exists or if the UPDATE environment variable is set to True
     if not os.path.exists(f'subgen{script_name}') or args.update or convert_to_bool(os.getenv('UPDATE')):
         print(f"Downloading subgen.py from GitHub branch {branch_name}...")
-        download_from_github(f"https://raw.githubusercontent.com/McCloudS/subgen/{branch_name}/subgen.py", f'subgen{script_name}')
+        download_from_github(f"https://raw.githubusercontent.com/jpsn123/subgen/{branch_name}/subgen.py", f'subgen{script_name}')
     else:
         print("subgen.py exists and UPDATE is set to False, skipping download.")
         

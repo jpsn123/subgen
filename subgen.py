@@ -28,6 +28,7 @@ import ast
 from watchdog.observers.polling import PollingObserver as Observer
 from watchdog.events import FileSystemEventHandler
 import faster_whisper
+from deep_translator import GoogleTranslator
 
 def get_key_by_value(d, value):
     reverse_dict = {v: k for k, v in d.items()}
@@ -453,6 +454,65 @@ def write_lrc(result, file_path):
             fraction = int((segment.start - int(segment.start)) * 100)
             file.write(f"[{minutes:02d}:{seconds:02d}.{fraction:02d}] {segment.text}\n")
 
+def format_time(seconds):
+    hours = int(seconds / 3600)
+    minutes = int((seconds % 3600) / 60)
+    seconds = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}".replace('.', ',')
+
+def split_subtitle(text, max_chars=50):
+    words = text.split()
+    lines = []
+    current_line = []
+    current_length = 0
+    
+    for word in words:
+        if current_length + len(word) + 1 > max_chars and current_line:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+            current_length = len(word)
+        else:
+            current_line.append(word)
+            current_length += len(word) + 1
+    
+    if current_line:
+        lines.append(' '.join(current_line))
+    
+    return lines
+
+def translate_sub(result, source_language: str, sub_path: str):
+    translator = GoogleTranslator(source=source_language, target="zh-CN")
+    srt_content = []
+    subtitle_count = 1
+
+    for segment in result:
+        start_time = segment.start
+        end_time = segment.end
+        text = segment.text.strip()
+        
+        if text:
+            translated_text = translator.translate(text)
+            split_lines = split_subtitle(translated_text)
+            
+            start_time_formatted = format_time(start_time)
+            end_time_formatted = format_time(end_time)
+            
+            if len(split_lines) == 1:
+                srt_content.append(f"{subtitle_count}\n{start_time_formatted} --> {end_time_formatted}\n{split_lines[0]}\n\n")
+                subtitle_count += 1
+            else:
+                time_per_line = (end_time - start_time) / len(split_lines)
+                for i, line in enumerate(split_lines):
+                    line_start = start_time + i * time_per_line
+                    line_end = line_start + time_per_line
+                    line_start_formatted = format_time(line_start)
+                    line_end_formatted = format_time(line_end)
+                    srt_content.append(f"{subtitle_count}\n{line_start_formatted} --> {line_end_formatted}\n{line}\n\n")
+                    subtitle_count += 1
+    
+    with open(sub_path, 'w', encoding='utf-8') as file:
+        file.writelines(srt_content)
+
 def gen_subtitles(file_path: str, transcription_type: str, force_language=None) -> None:
     """Generates subtitles for a video file.
 
@@ -493,7 +553,7 @@ def gen_subtitles(file_path: str, transcription_type: str, force_language=None) 
         if isAudioFileExtension(file_extension) and lrc_for_audio_files:
             write_lrc(result, file_name + '.lrc')
         else:
-            result.to_srt_vtt(file_name + subextension, word_level=word_level_highlight)
+            translate_sub(result, force_language, file_name + subextension)
 
         elapsed_time = time.time() - start_time
         minutes, seconds = divmod(int(elapsed_time), 60)
@@ -520,15 +580,13 @@ def gen_subtitles_queue(file_path: str, transcription_type: str, force_language=
         # Check if an internal subtitle with the force_language already exists
         if has_subtitle_language(file_path, force_language):
             message = f"{file_path} already has an internal subtitle for {force_language}, skipping generation"
-        if get_file_name_without_extension(file_path).endswith("-c") or get_file_name_without_extension(file_path).endswith("-uc"):
-            message = f"{file_path} already has an internal subtitle, skipping generation"
         # Check if an external subtitle with the force_language already exists
         elif skipifexternalsub and (os.path.exists(get_file_name_without_extension(file_path) + f".{force_language}.srt") or os.path.exists(get_file_name_without_extension(file_path) + f".{force_language}.ass")):
             message = f"{file_path} already has an external {force_language} subtitle created for this, skipping it"
-    else:
+    if not message:
         if has_subtitle_language(file_path, skipifinternalsublang):
             message = f"{file_path} already has an internal subtitle we want, skipping generation"
-        if get_file_name_without_extension(file_path).endswith("-c") or get_file_name_without_extension(file_path).endswith("-uc"):
+        elif get_file_name_without_extension(file_path).endswith("-c") or get_file_name_without_extension(file_path).endswith("-uc"):
             message = f"{file_path} already has an internal subtitle, skipping generation"
         elif os.path.exists(get_file_name_without_extension(file_path) + subextension):
             message = f"{file_path} already has a subtitle created for this, skipping it"
@@ -539,7 +597,6 @@ def gen_subtitles_queue(file_path: str, transcription_type: str, force_language=
         elif os.path.exists(get_file_name_without_extension(file_path) + '.lrc'):
             message = f"{file_path} already has a LRC created for this, skipping it"
         
-
     if message:
         logging.debug(message)
         return

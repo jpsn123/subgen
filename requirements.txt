@@ -8,3 +8,4 @@ python-multipart
 python-ffmpeg
 whisper
 watchdog
+deep-translator
